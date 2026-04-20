@@ -2,7 +2,18 @@ require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const GEMINI_KEY = process.env.GEMINI_API_KEY;
+
+console.log("TOKEN found:", TOKEN ? "YES ✅" : "NO ❌");
+console.log("GEMINI KEY found:", GEMINI_KEY ? "YES ✅" : "NO ❌");
+
+if (!TOKEN) {
+  console.error("❌ TELEGRAM_BOT_TOKEN missing!");
+  process.exit(1);
+}
+
+const bot = new TelegramBot(TOKEN, { polling: true });
 
 console.log("🚀 Science Solver Bot চালু হয়েছে!");
 
@@ -109,7 +120,7 @@ async function solveWithGemini(imageBase64, caption, mimeType) {
     "এই ছবিতে যে গণিত, পদার্থবিজ্ঞান বা রসায়নের প্রশ্ন আছে সেটা সমাধান করো।";
 
   const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
     {
       contents: [
         {
@@ -144,7 +155,7 @@ ${prompt}
 // Gemini দিয়ে text solve করো
 async function solveTextWithGemini(question) {
   const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
     {
       contents: [
         {
