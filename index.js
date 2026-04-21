@@ -1,29 +1,8 @@
 require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
-const http = require("http");
 
-// Render এর জন্য dummy HTTP server
-const PORT = process.env.PORT || 3000;
-http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end("Science Solver Bot is running!");
-}).listen(PORT, () => {
-  console.log(`HTTP server running on port ${PORT}`);
-});
-
-const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const GEMINI_KEY = process.env.GEMINI_API_KEY;
-
-console.log("TOKEN found:", TOKEN ? "YES ✅" : "NO ❌");
-console.log("GEMINI KEY found:", GEMINI_KEY ? "YES ✅" : "NO ❌");
-
-if (!TOKEN) {
-  console.error("❌ TELEGRAM_BOT_TOKEN missing!");
-  process.exit(1);
-}
-
-const bot = new TelegramBot(TOKEN, { polling: true });
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 
 console.log("🚀 Science Solver Bot চালু হয়েছে!");
 
@@ -77,7 +56,7 @@ bot.on("photo", async (msg) => {
 
     // Telegram থেকে ছবির URL নাও
     const fileInfo = await bot.getFile(fileId);
-    const fileUrl = `https://api.telegram.org/file/bot${TOKEN}/${fileInfo.file_path}`;
+    const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${fileInfo.file_path}`;
 
     // ছবি download করো
     const imageResponse = await axios.get(fileUrl, {
@@ -130,7 +109,7 @@ async function solveWithGemini(imageBase64, caption, mimeType) {
     "এই ছবিতে যে গণিত, পদার্থবিজ্ঞান বা রসায়নের প্রশ্ন আছে সেটা সমাধান করো।";
 
   const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
     {
       contents: [
         {
@@ -165,7 +144,7 @@ ${prompt}
 // Gemini দিয়ে text solve করো
 async function solveTextWithGemini(question) {
   const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
     {
       contents: [
         {
