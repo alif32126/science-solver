@@ -50,7 +50,7 @@ bot.on("photo", async (msg) => {
     const prompt = msg.caption || "এই ছবিতে যে গণিত, পদার্থবিজ্ঞান বা রসায়নের প্রশ্ন আছে সেটা সম্পূর্ণ বাংলায় Step-by-step সমাধান করো। প্রতিটি ধাপ আলাদা করে দেখাও এবং চূড়ান্ত উত্তর স্পষ্টভাবে দাও।";
 
     const geminiRes = await axios.post(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + GEMINI_KEY,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=" + GEMINI_KEY,
       {
         contents: [{
           parts: [
@@ -79,7 +79,7 @@ bot.on("message", async (msg) => {
     await bot.sendMessage(chatId, "⏳ সমাধান করছি, একটু অপেক্ষা করো...");
 
     const geminiRes = await axios.post(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + GEMINI_KEY,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=" + GEMINI_KEY,
       {
         contents: [{
           parts: [{ text: "তুমি একজন বিশেষজ্ঞ গণিত, পদার্থবিজ্ঞান ও রসায়ন শিক্ষক। সম্পূর্ণ বাংলায় Step-by-step সমাধান দাও:\n\n" + text }]
