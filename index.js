@@ -52,7 +52,7 @@ bot.on("photo", async (msg) => {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "google/gemini-2.0-flash-exp:free",
+        model: "google/gemini-flash-1.5-8b:free",
         messages: [
           {
             role: "user",
@@ -91,7 +91,7 @@ bot.on("message", async (msg) => {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "google/gemini-2.0-flash-exp:free",
+        model: "google/gemini-flash-1.5-8b:free",
         messages: [
           {
             role: "user",
