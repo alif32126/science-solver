@@ -32,7 +32,6 @@ const VISION_MODELS = [
   "google/gemma-3-27b-it:free",
   "google/gemma-3-12b-it:free",
   "google/gemma-3-4b-it:free",
-  "baidu/qianfan-ocr-fast:free"
 ];
 
 const TEXT_MODELS = [
