@@ -51,7 +51,7 @@ bot.on("photo", async (msg) => {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "qwen/qwen2.5-vl-72b-instruct:free",
+        model: "nvidia/nemotron-nano-12b-v2-vl:free",
         messages: [{
           role: "user",
           content: [
@@ -88,7 +88,7 @@ bot.on("message", async (msg) => {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "qwen/qwen2.5-vl-72b-instruct:free",
+        model: "nvidia/nemotron-nano-12b-v2-vl:free",
         messages: [{
           role: "user",
           content: "তুমি একজন বিশেষজ্ঞ গণিত, পদার্থবিজ্ঞান ও রসায়ন শিক্ষক। বাংলায় Step-by-step সমাধান দাও:\n\n" + text
