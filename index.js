@@ -61,7 +61,7 @@ bot.on("photo", async (msg) => {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "nvidia/nemotron-nano-12b-v2-vl:free",
+        model: "google/gemma-3-27b-it:free",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {
@@ -101,7 +101,7 @@ bot.on("message", async (msg) => {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "nvidia/nemotron-nano-12b-v2-vl:free",
+        model: "google/gemma-3-27b-it:free",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: text }
