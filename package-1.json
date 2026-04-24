@@ -1,0 +1,15 @@
+{
+  "name": "science-solver-bot",
+  "version": "1.0.0",
+  "description": "Telegram Science Solver Bot - Math, Physics, Chemistry",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.64.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.0.0",
+    "canvas": "^2.11.2"
+  }
+}
