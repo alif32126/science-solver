@@ -25,6 +25,16 @@ http.createServer((req, res) => {
 const bot = new TelegramBot(TOKEN, { polling: true });
 console.log("Science Solver Bot started!");
 
+const SYSTEM_PROMPT = `তুমি একজন বিশেষজ্ঞ গণিত, পদার্থবিজ্ঞান ও রসায়ন শিক্ষক। 
+নিচের নিয়ম মেনে উত্তর দাও:
+- সম্পূর্ণ বাংলায় লেখো
+- LaTeX ব্যবহার করবে না
+- Equation এইভাবে লেখো: sin(θ) = k × tan(φ), a² + b² = c²
+- Greek letter গুলো এইভাবে লেখো: θ (theta), φ (phi), α (alpha), β (beta), π (pi)
+- ভগ্নাংশ এইভাবে লেখো: (k-1)/(k+1)
+- প্রতিটি ধাপ নম্বর দিয়ে আলাদা করো
+- চূড়ান্ত উত্তর স্পষ্টভাবে দাও`;
+
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const name = msg.from.first_name || "বন্ধু";
@@ -46,19 +56,22 @@ bot.on("photo", async (msg) => {
 
     const imageResponse = await axios.get(fileUrl, { responseType: "arraybuffer" });
     const imageBase64 = Buffer.from(imageResponse.data).toString("base64");
-    const prompt = msg.caption || "এই ছবিতে যে গণিত, পদার্থবিজ্ঞান বা রসায়নের প্রশ্ন আছে সেটা বাংলায় Step-by-step সমাধান করো।";
+    const caption = msg.caption || "এই ছবিতে যে প্রশ্ন আছে সেটা সমাধান করো।";
 
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
         model: "nvidia/nemotron-nano-12b-v2-vl:free",
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: "data:image/jpeg;base64," + imageBase64 } }
-          ]
-        }]
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: caption },
+              { type: "image_url", image_url: { url: "data:image/jpeg;base64," + imageBase64 } }
+            ]
+          }
+        ]
       },
       {
         headers: {
@@ -89,10 +102,10 @@ bot.on("message", async (msg) => {
       "https://openrouter.ai/api/v1/chat/completions",
       {
         model: "nvidia/nemotron-nano-12b-v2-vl:free",
-        messages: [{
-          role: "user",
-          content: "তুমি একজন বিশেষজ্ঞ গণিত, পদার্থবিজ্ঞান ও রসায়ন শিক্ষক। বাংলায় Step-by-step সমাধান দাও:\n\n" + text
-        }]
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: text }
+        ]
       },
       {
         headers: {
