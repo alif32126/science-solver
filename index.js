@@ -30,7 +30,7 @@ bot.onText(/\/start/, (msg) => {
   const name = msg.from.first_name || "বন্ধু";
   bot.sendMessage(chatId,
     "🔬 Science Solver Bot এ স্বাগতম, " + name + "!\n\n" +
-    "গণিত, পদার্থবিজ্ঞান, রসায়নের যেকোনো প্রশ্নের ছবি পাঠাও — আমি বাংলায় Step-by-step সমাধান দিব!\n\n" +
+    "গণিত, পদার্থবিজ্ঞান, রসায়নের যেকোনো প্রশ্নের ছবি পাঠাও!\n\n" +
     "অথবা সরাসরি টাইপ করেও প্রশ্ন করতে পারো।"
   );
 });
@@ -38,7 +38,7 @@ bot.onText(/\/start/, (msg) => {
 bot.on("photo", async (msg) => {
   const chatId = msg.chat.id;
   try {
-    await bot.sendMessage(chatId, "⏳ ছবি বিশ্লেষণ করছি, একটু অপেক্ষা করো...");
+    await bot.sendMessage(chatId, "⏳ ছবি বিশ্লেষণ করছি...");
 
     const photo = msg.photo[msg.photo.length - 1];
     const fileInfo = await bot.getFile(photo.file_id);
@@ -46,22 +46,19 @@ bot.on("photo", async (msg) => {
 
     const imageResponse = await axios.get(fileUrl, { responseType: "arraybuffer" });
     const imageBase64 = Buffer.from(imageResponse.data).toString("base64");
-
-    const prompt = msg.caption || "এই ছবিতে যে গণিত, পদার্থবিজ্ঞান বা রসায়নের প্রশ্ন আছে সেটা সম্পূর্ণ বাংলায় Step-by-step সমাধান করো।";
+    const prompt = msg.caption || "এই ছবিতে যে গণিত, পদার্থবিজ্ঞান বা রসায়নের প্রশ্ন আছে সেটা বাংলায় Step-by-step সমাধান করো।";
 
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "meta-llama/llama-3.2-11b-vision-instruct:free",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              { type: "image_url", image_url: { url: "data:image/jpeg;base64," + imageBase64 } }
-            ]
-          }
-        ]
+        model: "google/gemma-4-31b-it:free",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: "data:image/jpeg;base64," + imageBase64 } }
+          ]
+        }]
       },
       {
         headers: {
@@ -86,18 +83,16 @@ bot.on("message", async (msg) => {
   if (!text || text.startsWith("/")) return;
 
   try {
-    await bot.sendMessage(chatId, "⏳ সমাধান করছি, একটু অপেক্ষা করো...");
+    await bot.sendMessage(chatId, "⏳ সমাধান করছি...");
 
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "meta-llama/llama-3.2-11b-vision-instruct:free",
-        messages: [
-          {
-            role: "user",
-            content: "তুমি একজন বিশেষজ্ঞ গণিত, পদার্থবিজ্ঞান ও রসায়ন শিক্ষক। সম্পূর্ণ বাংলায় Step-by-step সমাধান দাও:\n\n" + text
-          }
-        ]
+        model: "google/gemma-4-31b-it:free",
+        messages: [{
+          role: "user",
+          content: "তুমি একজন বিশেষজ্ঞ গণিত, পদার্থবিজ্ঞান ও রসায়ন শিক্ষক। বাংলায় Step-by-step সমাধান দাও:\n\n" + text
+        }]
       },
       {
         headers: {
