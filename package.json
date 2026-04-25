@@ -9,7 +9,6 @@
   "dependencies": {
     "node-telegram-bot-api": "^0.64.0",
     "axios": "^1.6.0",
-    "dotenv": "^16.0.0",
-    "canvas": "^2.11.2"
+    "dotenv": "^16.0.0"
   }
 }
