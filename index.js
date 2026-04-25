@@ -68,6 +68,58 @@ const CHAT_PROMPT = `তুমি একটি বাংলাদেশি Scien
 যদি কেউ সাধারণ কথা বলে (যেমন Hi, Hello, কেমন আছ) তাহলে বাংলায় সহজভাবে উত্তর দাও।
 যদি বিজ্ঞান বা গণিতের প্রশ্ন করে তাহলে ভালোভাবে সমাধান করো।`;
 
+// LaTeX clean করো
+function cleanLatex(text) {
+  return text
+    .replace(/\\theta/g, 'θ')
+    .replace(/\\phi/g, 'φ')
+    .replace(/\\varphi/g, 'φ')
+    .replace(/\\alpha/g, 'α')
+    .replace(/\\beta/g, 'β')
+    .replace(/\\gamma/g, 'γ')
+    .replace(/\\delta/g, 'δ')
+    .replace(/\\pi/g, 'π')
+    .replace(/\\lambda/g, 'λ')
+    .replace(/\\omega/g, 'ω')
+    .replace(/\\Delta/g, 'Δ')
+    .replace(/\\sin/g, 'sin')
+    .replace(/\\cos/g, 'cos')
+    .replace(/\\tan/g, 'tan')
+    .replace(/\\cot/g, 'cot')
+    .replace(/\\sec/g, 'sec')
+    .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
+    .replace(/\\sqrt/g, '√')
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)')
+    .replace(/\\frac/g, '/')
+    .replace(/\\cdot/g, '×')
+    .replace(/\\times/g, '×')
+    .replace(/\\div/g, '÷')
+    .replace(/\\leq/g, '≤')
+    .replace(/\\geq/g, '≥')
+    .replace(/\\neq/g, '≠')
+    .replace(/\\approx/g, '≈')
+    .replace(/\\infty/g, '∞')
+    .replace(/\\left\(/g, '(')
+    .replace(/\\right\)/g, ')')
+    .replace(/\\left\[/g, '[')
+    .replace(/\\right\]/g, ']')
+    .replace(/\\left/g, '')
+    .replace(/\\right/g, '')
+    .replace(/\\\[/g, '')
+    .replace(/\\\]/g, '')
+    .replace(/\\\(/g, '')
+    .replace(/\\\)/g, '')
+    .replace(/\$\$/g, '')
+    .replace(/\$/g, '')
+    .replace(/\\\\/g, '\n')
+    .replace(/\\text\{([^}]+)\}/g, '$1')
+    .replace(/\{/g, '')
+    .replace(/\}/g, '')
+    .replace(/\\_/g, '_')
+    .replace(/\\\^/g, '^')
+    .trim();
+}
+
 async function callAPI(model, messages) {
   const response = await axios.post(
     "https://openrouter.ai/api/v1/chat/completions",
@@ -137,7 +189,7 @@ bot.on("photo", async (msg) => {
     }
 
     if (solution) {
-      await bot.sendMessage(chatId, solution);
+      await bot.sendMessage(chatId, cleanLatex(solution));
     } else {
       await bot.sendMessage(chatId, "❌ সব model এখন busy। একটু পরে আবার চেষ্টা করো।");
     }
@@ -177,7 +229,7 @@ bot.on("message", async (msg) => {
     }
 
     if (solution) {
-      await bot.sendMessage(chatId, solution);
+      await bot.sendMessage(chatId, cleanLatex(solution));
     } else {
       await bot.sendMessage(chatId, "❌ সব model এখন busy। একটু পরে আবার চেষ্টা করো।");
     }
