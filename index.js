@@ -22,6 +22,14 @@ http.createServer((req, res) => {
   console.log("HTTP server running on port " + PORT);
 });
 
+// প্রতি ১৪ মিনিটে self-ping করে bot জাগিয়ে রাখো
+const RENDER_URL = "https://science-solver-bot-a3hr.onrender.com";
+setInterval(() => {
+  axios.get(RENDER_URL).then(() => {
+    console.log("Self-ping OK");
+  }).catch(() => {});
+}, 14 * 60 * 1000);
+
 const bot = new TelegramBot(TOKEN, { polling: true });
 console.log("Science Solver Bot started!");
 
