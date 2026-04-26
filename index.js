@@ -6,49 +6,60 @@ const puppeteer = require("puppeteer");
 const fs = require("fs");
 const path = require("path");
 
+/* =========================
+   ENVIRONMENT VARIABLES
+========================= */
+
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+const RENDER_URL = process.env.RENDER_URL;
 
 if (!TOKEN || !OPENROUTER_KEY) {
-  console.error("Environment variables missing!");
+  console.error("❌ Environment variables missing!");
   process.exit(1);
 }
 
-/* ---------------- HTTP SERVER ---------------- */
+/* =========================
+   HTTP SERVER
+========================= */
 
 const PORT = process.env.PORT || 3000;
 
 http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
-  res.end("Science Solver Bot is running!");
+  res.end("Science Solver Bot is Running!");
 }).listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`✅ Server running on port ${PORT}`);
 });
 
-/* ---------------- SELF PING ---------------- */
-
-const RENDER_URL = process.env.RENDER_URL;
+/* =========================
+   SELF PING
+========================= */
 
 if (RENDER_URL) {
   setInterval(async () => {
     try {
       await axios.get(RENDER_URL);
-      console.log("Self-ping successful");
+      console.log("🏓 Self ping successful");
     } catch (error) {
-      console.log("Self-ping failed");
+      console.log("⚠️ Self ping failed");
     }
   }, 14 * 60 * 1000);
 }
 
-/* ---------------- TELEGRAM BOT ---------------- */
+/* =========================
+   TELEGRAM BOT
+========================= */
 
 const bot = new TelegramBot(TOKEN, {
   polling: true
 });
 
-console.log("Science Solver Bot started successfully!");
+console.log("🤖 Science Solver Bot Started");
 
-/* ---------------- MODELS ---------------- */
+/* =========================
+   AI MODELS
+========================= */
 
 const VISION_MODELS = [
   "qwen/qwen2.5-vl-72b-instruct:free",
@@ -63,27 +74,35 @@ const TEXT_MODELS = [
   "google/gemma-3-27b-it:free"
 ];
 
-/* ---------------- PROMPTS ---------------- */
+/* =========================
+   SYSTEM PROMPTS
+========================= */
 
 const SCIENCE_PROMPT = `
-তুমি একজন HSC পর্যায়ের বাংলাদেশি গণিত, পদার্থবিজ্ঞান ও রসায়ন শিক্ষক।
+তুমি একজন HSC পর্যায়ের বাংলাদেশি গণিত, পদার্থবিজ্ঞান ও রসায়ন শিক্ষক।
 
-নিয়ম:
-1. সম্পূর্ণ বাংলায় উত্তর দাও।
+কঠোর নিয়ম:
+1. সম্পূর্ণ বাংলায় উত্তর দেবে।
 2. LaTeX ব্যবহার করবে না।
 3. ধাপে ধাপে সমাধান করবে।
-4. Equation সাধারণ টেক্সটে লিখবে।
-5. শেষে "∴ উত্তর:" লিখবে।
+4. Equation সাধারণ text এ লিখবে।
+5. ভগ্নাংশ (a+b)/(c+d) আকারে লিখবে।
+6. Greek letter সরাসরি লিখবে: θ, φ, α, β, π
+7. শেষে "∴ উত্তর:" লিখবে।
 `;
 
 const CHAT_PROMPT = `
-তুমি একটি বন্ধুসুলভ বাংলাদেশি Science Solver Bot।
-সাধারণ কথার সহজ বাংলায় উত্তর দাও।
+তুমি একটি বন্ধুসুলভ বাংলাদেশি AI Assistant।
+সাধারণ প্রশ্নের উত্তর সুন্দর বাংলায় দাও।
 `;
 
-/* ---------------- LATEX CLEANER ---------------- */
+/* =========================
+   LATEX CLEANER
+========================= */
 
 function cleanLatex(text) {
+  if (!text) return "";
+
   return text
     .replace(/\\theta/g, "θ")
     .replace(/\\phi/g, "φ")
@@ -111,82 +130,104 @@ function cleanLatex(text) {
     .trim();
 }
 
-/* ---------------- IMAGE GENERATOR ---------------- */
+/* =========================
+   IMAGE GENERATOR
+========================= */
 
 async function createSolutionImage(solution) {
   const browser = await puppeteer.launch({
-    headless: "new",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    headless: true,
+    executablePath:
+      process.env.PUPPETEER_EXECUTABLE_PATH ||
+      puppeteer.executablePath(),
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--no-first-run",
+      "--no-zygote",
+      "--single-process"
+    ]
   });
 
-  const page = await browser.newPage();
+  try {
+    const page = await browser.newPage();
 
-  const html = `
-  <!DOCTYPE html>
-  <html lang="bn">
-  <head>
-    <meta charset="UTF-8">
-    <style>
-      body {
-        width: 1000px;
-        margin: 0;
-        padding: 40px;
-        background: linear-gradient(135deg, #eff6ff, #dbeafe);
-        font-family: Arial, sans-serif;
-      }
+    await page.setViewport({
+      width: 1200,
+      height: 800,
+      deviceScaleFactor: 2
+    });
 
-      .card {
-        background: white;
-        border-radius: 30px;
-        padding: 50px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-      }
+    const html = `
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<style>
+body{
+  margin:0;
+  padding:40px;
+  width:1100px;
+  background:linear-gradient(135deg,#eff6ff,#dbeafe);
+  font-family:Arial,sans-serif;
+}
+.card{
+  background:#ffffff;
+  border-radius:30px;
+  padding:60px;
+  box-shadow:0 25px 70px rgba(0,0,0,0.18);
+}
+h1{
+  text-align:center;
+  color:#2563eb;
+  font-size:52px;
+  margin-bottom:45px;
+}
+pre{
+  margin:0;
+  white-space:pre-wrap;
+  word-wrap:break-word;
+  font-size:30px;
+  line-height:1.9;
+  color:#111827;
+  font-family:Arial,sans-serif;
+}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>সমাধান</h1>
+    <pre>${solution}</pre>
+  </div>
+</body>
+</html>`;
 
-      h1 {
-        text-align: center;
-        color: #2563eb;
-        margin-bottom: 40px;
-        font-size: 50px;
-      }
+    await page.setContent(html, {
+      waitUntil: "networkidle0"
+    });
 
-      pre {
-        white-space: pre-wrap;
-        word-wrap: break-word;
-        font-size: 28px;
-        line-height: 1.9;
-        color: #111827;
-        margin: 0;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h1>সমাধান</h1>
-      <pre>${solution}</pre>
-    </div>
-  </body>
-  </html>
-  `;
+    const filePath = path.join(
+      __dirname,
+      `solution_${Date.now()}.png`
+    );
 
-  await page.setContent(html, {
-    waitUntil: "networkidle0"
-  });
+    await page.screenshot({
+      path: filePath,
+      fullPage: true,
+      type: "png"
+    });
 
-  const filePath = path.join(
-    __dirname,
-    `solution_${Date.now()}.png`
-  );
-
-  await page.screenshot({
-    path: filePath,
-    fullPage: true
-  });
-
-  await browser.close();
-  return filePath;
+    return filePath;
+  } finally {
+    await browser.close();
+  }
 }
 
-/* ---------------- OPENROUTER API ---------------- */
+/* =========================
+   OPENROUTER API
+========================= */
 
 async function callAPI(model, messages) {
   const response = await axios.post(
@@ -203,14 +244,16 @@ async function callAPI(model, messages) {
         "HTTP-Referer": "https://science-solver-bot.onrender.com",
         "X-Title": "Science Solver Bot"
       },
-      timeout: 30000
+      timeout: 45000
     }
   );
 
   return response.data.choices[0].message.content;
 }
 
-/* ---------------- HELPERS ---------------- */
+/* =========================
+   HELPERS
+========================= */
 
 function isScienceQuestion(text) {
   const keywords = [
@@ -219,15 +262,17 @@ function isScienceQuestion(text) {
     "নির্ণয়",
     "গণনা",
     "হিসাব",
+    "গণিত",
+    "পদার্থ",
+    "রসায়ন",
     "sin",
     "cos",
     "tan",
     "বল",
     "বেগ",
     "ত্বরণ",
-    "রসায়ন",
-    "পদার্থ",
-    "গণিত"
+    "mole",
+    "atom"
   ];
 
   return keywords.some(word =>
@@ -238,12 +283,12 @@ function isScienceQuestion(text) {
 async function generateResponse(models, messages) {
   for (const model of models) {
     try {
-      console.log(`Trying: ${model}`);
+      console.log(`Trying ${model}`);
       const result = await callAPI(model, messages);
-      console.log(`Success: ${model}`);
+      console.log(`Success ${model}`);
       return result;
     } catch (error) {
-      console.log(`Failed: ${model}`);
+      console.log(`Failed ${model}`);
     }
   }
 
@@ -261,7 +306,9 @@ async function sendSolutionImage(chatId, solution) {
   fs.unlinkSync(imagePath);
 }
 
-/* ---------------- COMMANDS ---------------- */
+/* =========================
+   START COMMAND
+========================= */
 
 bot.onText(/\/start/, async (msg) => {
   const name = msg.from.first_name || "বন্ধু";
@@ -278,7 +325,9 @@ bot.onText(/\/start/, async (msg) => {
   );
 });
 
-/* ---------------- PHOTO HANDLER ---------------- */
+/* =========================
+   PHOTO HANDLER
+========================= */
 
 bot.on("photo", async (msg) => {
   const chatId = msg.chat.id;
@@ -330,15 +379,18 @@ bot.on("photo", async (msg) => {
     );
 
     if (!solution) {
-      return bot.sendMessage(
+      await bot.sendMessage(
         chatId,
-        "❌ সব AI model বর্তমানে ব্যস্ত।"
+        "❌ সব AI Model বর্তমানে ব্যস্ত।"
       );
+      return;
     }
 
     await sendSolutionImage(chatId, solution);
+
   } catch (error) {
-    console.error(error);
+    console.error("PHOTO ERROR:", error);
+
     await bot.sendMessage(
       chatId,
       "❌ ছবি প্রসেস করতে সমস্যা হয়েছে।"
@@ -346,7 +398,9 @@ bot.on("photo", async (msg) => {
   }
 });
 
-/* ---------------- TEXT HANDLER ---------------- */
+/* =========================
+   TEXT HANDLER
+========================= */
 
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
@@ -359,9 +413,7 @@ bot.on("message", async (msg) => {
 
     await bot.sendMessage(
       chatId,
-      science
-        ? "⏳ সমাধান করছি..."
-        : "⏳ ভাবছি..."
+      science ? "⏳ সমাধান করছি..." : "⏳ ভাবছি..."
     );
 
     const messages = [
@@ -377,25 +429,31 @@ bot.on("message", async (msg) => {
       }
     ];
 
-    const solution = await generateResponse(
+    const answer = await generateResponse(
       TEXT_MODELS,
       messages
     );
 
-    if (!solution) {
-      return bot.sendMessage(
+    if (!answer) {
+      await bot.sendMessage(
         chatId,
-        "❌ সব AI model বর্তমানে ব্যস্ত।"
+        "❌ সব AI Model বর্তমানে ব্যস্ত।"
       );
+      return;
     }
 
     if (science) {
-      await sendSolutionImage(chatId, solution);
+      await sendSolutionImage(chatId, answer);
     } else {
-      await bot.sendMessage(chatId, cleanLatex(solution));
+      await bot.sendMessage(
+        chatId,
+        cleanLatex(answer)
+      );
     }
+
   } catch (error) {
-    console.error(error);
+    console.error("TEXT ERROR:", error);
+
     await bot.sendMessage(
       chatId,
       "❌ একটি সমস্যা হয়েছে। আবার চেষ্টা করো।"
