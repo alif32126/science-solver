@@ -2,240 +2,403 @@ require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const http = require("http");
+const puppeteer = require("puppeteer");
+const fs = require("fs");
+const path = require("path");
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
-console.log("TOKEN found:", TOKEN ? "YES" : "NO");
-console.log("OPENROUTER KEY found:", OPENROUTER_KEY ? "YES" : "NO");
-
-if (!TOKEN) {
-  console.error("TELEGRAM_BOT_TOKEN missing!");
+if (!TOKEN || !OPENROUTER_KEY) {
+  console.error("Environment variables missing!");
   process.exit(1);
 }
 
+/* ---------------- HTTP SERVER ---------------- */
+
 const PORT = process.env.PORT || 3000;
+
 http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end("Bot is running!");
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("Science Solver Bot is running!");
 }).listen(PORT, () => {
-  console.log("HTTP server running on port " + PORT);
+  console.log(`Server running on port ${PORT}`);
 });
 
-// প্রতি ১৪ মিনিটে self-ping করে bot জাগিয়ে রাখো
-const RENDER_URL = "https://science-solver-bot-a3hr.onrender.com";
-setInterval(() => {
-  axios.get(RENDER_URL).then(() => {
-    console.log("Self-ping OK");
-  }).catch(() => {});
-}, 14 * 60 * 1000);
+/* ---------------- SELF PING ---------------- */
 
-const bot = new TelegramBot(TOKEN, { polling: true });
-console.log("Science Solver Bot started!");
+const RENDER_URL = process.env.RENDER_URL;
+
+if (RENDER_URL) {
+  setInterval(async () => {
+    try {
+      await axios.get(RENDER_URL);
+      console.log("Self-ping successful");
+    } catch (error) {
+      console.log("Self-ping failed");
+    }
+  }, 14 * 60 * 1000);
+}
+
+/* ---------------- TELEGRAM BOT ---------------- */
+
+const bot = new TelegramBot(TOKEN, {
+  polling: true
+});
+
+console.log("Science Solver Bot started successfully!");
+
+/* ---------------- MODELS ---------------- */
 
 const VISION_MODELS = [
-  "google/gemma-4-31b-it:free",
-  "google/gemma-4-26b-a4b-it:free",
+  "qwen/qwen2.5-vl-72b-instruct:free",
   "google/gemma-3-27b-it:free",
-  "nvidia/nemotron-nano-12b-v2-vl:free",
-  "google/gemma-3-12b-it:free",
-  "google/gemma-3-4b-it:free"
+  "nvidia/nemotron-nano-12b-v2-vl:free"
 ];
 
 const TEXT_MODELS = [
+  "deepseek/deepseek-r1-0528:free",
+  "qwen/qwen3-235b-a22b:free",
   "meta-llama/llama-3.3-70b-instruct:free",
-  "google/gemma-4-31b-it:free",
-  "google/gemma-4-26b-a4b-it:free",
-  "google/gemma-3-27b-it:free",
-  "nvidia/nemotron-nano-12b-v2-vl:free",
-  "google/gemma-3-12b-it:free",
-  "meta-llama/llama-3.2-3b-instruct:free"
+  "google/gemma-3-27b-it:free"
 ];
 
-const SCIENCE_PROMPT = `তুমি একজন HSC পর্যায়ের বাংলাদেশি গণিত, পদার্থবিজ্ঞান ও রসায়ন শিক্ষক।
+/* ---------------- PROMPTS ---------------- */
 
-কঠোর নিয়ম:
-১. সম্পূর্ণ বাংলায় লেখো।
-২. LaTeX সম্পূর্ণ নিষিদ্ধ। \frac, \tan, \sin, \cos, $$, \[, \] এগুলো কখনো লিখবে না।
-৩. Equation এভাবে লেখো: tan θ = k tan φ, sin(θ - φ) = (k-1)/(k+1) × sin α
-৪. Greek letter সরাসরি লেখো: θ, φ, α, β, π, λ, Δ, ω
-৫. ভগ্নাংশ: (a+b)/(c+d) এভাবে লেখো
-৬. ঘাত: a², b³, x^n এভাবে লেখো
-৭. ধাপ ১:, ধাপ ২: করে লেখো
-৮. শেষে "∴ উত্তর:" দিয়ে শেষ করো`;
+const SCIENCE_PROMPT = `
+তুমি একজন HSC পর্যায়ের বাংলাদেশি গণিত, পদার্থবিজ্ঞান ও রসায়ন শিক্ষক।
 
-const CHAT_PROMPT = `তুমি একটি বাংলাদেশি Science Solver Bot। 
-যদি কেউ সাধারণ কথা বলে (যেমন Hi, Hello, কেমন আছ) তাহলে বাংলায় সহজভাবে উত্তর দাও।
-যদি বিজ্ঞান বা গণিতের প্রশ্ন করে তাহলে ভালোভাবে সমাধান করো।`;
+নিয়ম:
+1. সম্পূর্ণ বাংলায় উত্তর দাও।
+2. LaTeX ব্যবহার করবে না।
+3. ধাপে ধাপে সমাধান করবে।
+4. Equation সাধারণ টেক্সটে লিখবে।
+5. শেষে "∴ উত্তর:" লিখবে।
+`;
 
-// LaTeX clean করো
+const CHAT_PROMPT = `
+তুমি একটি বন্ধুসুলভ বাংলাদেশি Science Solver Bot।
+সাধারণ কথার সহজ বাংলায় উত্তর দাও।
+`;
+
+/* ---------------- LATEX CLEANER ---------------- */
+
 function cleanLatex(text) {
   return text
-    .replace(/\\theta/g, 'θ')
-    .replace(/\\phi/g, 'φ')
-    .replace(/\\varphi/g, 'φ')
-    .replace(/\\alpha/g, 'α')
-    .replace(/\\beta/g, 'β')
-    .replace(/\\gamma/g, 'γ')
-    .replace(/\\delta/g, 'δ')
-    .replace(/\\pi/g, 'π')
-    .replace(/\\lambda/g, 'λ')
-    .replace(/\\omega/g, 'ω')
-    .replace(/\\Delta/g, 'Δ')
-    .replace(/\\sin/g, 'sin')
-    .replace(/\\cos/g, 'cos')
-    .replace(/\\tan/g, 'tan')
-    .replace(/\\cot/g, 'cot')
-    .replace(/\\sec/g, 'sec')
-    .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
-    .replace(/\\sqrt/g, '√')
-    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)')
-    .replace(/\\frac/g, '/')
-    .replace(/\\cdot/g, '×')
-    .replace(/\\times/g, '×')
-    .replace(/\\div/g, '÷')
-    .replace(/\\leq/g, '≤')
-    .replace(/\\geq/g, '≥')
-    .replace(/\\neq/g, '≠')
-    .replace(/\\approx/g, '≈')
-    .replace(/\\infty/g, '∞')
-    .replace(/\\left\(/g, '(')
-    .replace(/\\right\)/g, ')')
-    .replace(/\\left\[/g, '[')
-    .replace(/\\right\]/g, ']')
-    .replace(/\\left/g, '')
-    .replace(/\\right/g, '')
-    .replace(/\\\[/g, '')
-    .replace(/\\\]/g, '')
-    .replace(/\\\(/g, '')
-    .replace(/\\\)/g, '')
-    .replace(/\$\$/g, '')
-    .replace(/\$/g, '')
-    .replace(/\\\\/g, '\n')
-    .replace(/\\text\{([^}]+)\}/g, '$1')
-    .replace(/\{/g, '')
-    .replace(/\}/g, '')
-    .replace(/\\_/g, '_')
-    .replace(/\\\^/g, '^')
+    .replace(/\\theta/g, "θ")
+    .replace(/\\phi/g, "φ")
+    .replace(/\\alpha/g, "α")
+    .replace(/\\beta/g, "β")
+    .replace(/\\gamma/g, "γ")
+    .replace(/\\delta/g, "δ")
+    .replace(/\\pi/g, "π")
+    .replace(/\\lambda/g, "λ")
+    .replace(/\\omega/g, "ω")
+    .replace(/\\Delta/g, "Δ")
+    .replace(/\\sin/g, "sin")
+    .replace(/\\cos/g, "cos")
+    .replace(/\\tan/g, "tan")
+    .replace(/\\sqrt\{([^}]+)\}/g, "√($1)")
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "($1)/($2)")
+    .replace(/\\cdot/g, "×")
+    .replace(/\\times/g, "×")
+    .replace(/\\div/g, "÷")
+    .replace(/\$\$/g, "")
+    .replace(/\$/g, "")
+    .replace(/\\\\/g, "\n")
+    .replace(/\\text\{([^}]+)\}/g, "$1")
+    .replace(/[{}]/g, "")
     .trim();
 }
+
+/* ---------------- IMAGE GENERATOR ---------------- */
+
+async function createSolutionImage(solution) {
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+  });
+
+  const page = await browser.newPage();
+
+  const html = `
+  <!DOCTYPE html>
+  <html lang="bn">
+  <head>
+    <meta charset="UTF-8">
+    <style>
+      body {
+        width: 1000px;
+        margin: 0;
+        padding: 40px;
+        background: linear-gradient(135deg, #eff6ff, #dbeafe);
+        font-family: Arial, sans-serif;
+      }
+
+      .card {
+        background: white;
+        border-radius: 30px;
+        padding: 50px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+      }
+
+      h1 {
+        text-align: center;
+        color: #2563eb;
+        margin-bottom: 40px;
+        font-size: 50px;
+      }
+
+      pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        font-size: 28px;
+        line-height: 1.9;
+        color: #111827;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>সমাধান</h1>
+      <pre>${solution}</pre>
+    </div>
+  </body>
+  </html>
+  `;
+
+  await page.setContent(html, {
+    waitUntil: "networkidle0"
+  });
+
+  const filePath = path.join(
+    __dirname,
+    `solution_${Date.now()}.png`
+  );
+
+  await page.screenshot({
+    path: filePath,
+    fullPage: true
+  });
+
+  await browser.close();
+  return filePath;
+}
+
+/* ---------------- OPENROUTER API ---------------- */
 
 async function callAPI(model, messages) {
   const response = await axios.post(
     "https://openrouter.ai/api/v1/chat/completions",
-    { model, messages, temperature: 0.3 },
+    {
+      model,
+      messages,
+      temperature: 0.2
+    },
     {
       headers: {
-        "Authorization": "Bearer " + OPENROUTER_KEY,
+        Authorization: `Bearer ${OPENROUTER_KEY}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://science-solver-bot.onrender.com",
         "X-Title": "Science Solver Bot"
       },
-      timeout: 45000
+      timeout: 30000
     }
   );
+
   return response.data.choices[0].message.content;
 }
 
+/* ---------------- HELPERS ---------------- */
+
 function isScienceQuestion(text) {
-  const keywords = ["সমাধান", "প্রমাণ", "নির্ণয়", "গণনা", "হিসাব", "equation", "sin", "cos", "tan", "force", "velocity", "acceleration", "mol", "atom", "বল", "বেগ", "ত্বরণ", "তরঙ্গ", "চাপ", "তাপ", "আলো", "বিদ্যুৎ", "রাসায়নিক", "যৌগ"];
-  return keywords.some(k => text.toLowerCase().includes(k.toLowerCase()));
+  const keywords = [
+    "সমাধান",
+    "প্রমাণ",
+    "নির্ণয়",
+    "গণনা",
+    "হিসাব",
+    "sin",
+    "cos",
+    "tan",
+    "বল",
+    "বেগ",
+    "ত্বরণ",
+    "রসায়ন",
+    "পদার্থ",
+    "গণিত"
+  ];
+
+  return keywords.some(word =>
+    text.toLowerCase().includes(word.toLowerCase())
+  );
 }
 
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
+async function generateResponse(models, messages) {
+  for (const model of models) {
+    try {
+      console.log(`Trying: ${model}`);
+      const result = await callAPI(model, messages);
+      console.log(`Success: ${model}`);
+      return result;
+    } catch (error) {
+      console.log(`Failed: ${model}`);
+    }
+  }
+
+  return null;
+}
+
+async function sendSolutionImage(chatId, solution) {
+  const cleaned = cleanLatex(solution);
+  const imagePath = await createSolutionImage(cleaned);
+
+  await bot.sendPhoto(chatId, imagePath, {
+    caption: "✅ সমাধান প্রস্তুত"
+  });
+
+  fs.unlinkSync(imagePath);
+}
+
+/* ---------------- COMMANDS ---------------- */
+
+bot.onText(/\/start/, async (msg) => {
   const name = msg.from.first_name || "বন্ধু";
-  bot.sendMessage(chatId,
-    "🔬 *Science Solver Bot* এ স্বাগতম, " + name + "!\n\n" +
-    "📐 গণিত | ⚡ পদার্থবিজ্ঞান | 🧪 রসায়ন\n\n" +
-    "প্রশ্নের ছবি পাঠাও অথবা টাইপ করো!",
-    { parse_mode: "Markdown" }
+
+  await bot.sendMessage(
+    msg.chat.id,
+    `🔬 Science Solver Bot এ স্বাগতম, ${name}!
+
+📚 গণিত
+⚡ পদার্থবিজ্ঞান
+🧪 রসায়ন
+
+প্রশ্ন লিখে পাঠাও অথবা ছবি পাঠাও।`
   );
 });
 
+/* ---------------- PHOTO HANDLER ---------------- */
+
 bot.on("photo", async (msg) => {
   const chatId = msg.chat.id;
+
   try {
     await bot.sendMessage(chatId, "⏳ ছবি বিশ্লেষণ করছি...");
 
     const photo = msg.photo[msg.photo.length - 1];
-    const fileInfo = await bot.getFile(photo.file_id);
-    const fileUrl = "https://api.telegram.org/file/bot" + TOKEN + "/" + fileInfo.file_path;
-    const imageResponse = await axios.get(fileUrl, { responseType: "arraybuffer" });
-    const imageBase64 = Buffer.from(imageResponse.data).toString("base64");
-    const caption = msg.caption || "এই ছবিতে যে প্রশ্ন আছে সেটা বাংলায় ধাপে ধাপে সমাধান করো।";
+    const file = await bot.getFile(photo.file_id);
+
+    const fileUrl =
+      `https://api.telegram.org/file/bot${TOKEN}/${file.file_path}`;
+
+    const response = await axios.get(fileUrl, {
+      responseType: "arraybuffer"
+    });
+
+    const base64 = Buffer.from(response.data).toString("base64");
+
+    const caption =
+      msg.caption ||
+      "এই ছবির প্রশ্নটি বাংলায় ধাপে ধাপে সমাধান করো।";
 
     const messages = [
-      { role: "system", content: SCIENCE_PROMPT },
+      {
+        role: "system",
+        content: SCIENCE_PROMPT
+      },
       {
         role: "user",
         content: [
-          { type: "text", text: caption },
-          { type: "image_url", image_url: { url: "data:image/jpeg;base64," + imageBase64 } }
+          {
+            type: "text",
+            text: caption
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/jpeg;base64,${base64}`
+            }
+          }
         ]
       }
     ];
 
-    let solution = null;
-    for (const model of VISION_MODELS) {
-      try {
-        console.log("Trying:", model);
-        solution = await callAPI(model, messages);
-        console.log("Success:", model);
-        break;
-      } catch (e) {
-        console.log("Failed:", model);
-      }
+    const solution = await generateResponse(
+      VISION_MODELS,
+      messages
+    );
+
+    if (!solution) {
+      return bot.sendMessage(
+        chatId,
+        "❌ সব AI model বর্তমানে ব্যস্ত।"
+      );
     }
 
-    if (solution) {
-      await bot.sendMessage(chatId, cleanLatex(solution));
-    } else {
-      await bot.sendMessage(chatId, "❌ সব model এখন busy। একটু পরে আবার চেষ্টা করো।");
-    }
-
+    await sendSolutionImage(chatId, solution);
   } catch (error) {
-    console.error("Photo error:", error.message);
-    await bot.sendMessage(chatId, "❌ দুঃখিত, সমস্যা হয়েছে। আবার চেষ্টা করো।");
+    console.error(error);
+    await bot.sendMessage(
+      chatId,
+      "❌ ছবি প্রসেস করতে সমস্যা হয়েছে।"
+    );
   }
 });
+
+/* ---------------- TEXT HANDLER ---------------- */
 
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
+
   if (!text || text.startsWith("/")) return;
 
   try {
-    const isScience = isScienceQuestion(text);
-    const systemPrompt = isScience ? SCIENCE_PROMPT : CHAT_PROMPT;
+    const science = isScienceQuestion(text);
 
-    await bot.sendMessage(chatId, isScience ? "⏳ সমাধান করছি..." : "⏳ ...");
+    await bot.sendMessage(
+      chatId,
+      science
+        ? "⏳ সমাধান করছি..."
+        : "⏳ ভাবছি..."
+    );
 
     const messages = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: text }
+      {
+        role: "system",
+        content: science
+          ? SCIENCE_PROMPT
+          : CHAT_PROMPT
+      },
+      {
+        role: "user",
+        content: text
+      }
     ];
 
-    let solution = null;
-    for (const model of TEXT_MODELS) {
-      try {
-        console.log("Trying:", model);
-        solution = await callAPI(model, messages);
-        console.log("Success:", model);
-        break;
-      } catch (e) {
-        console.log("Failed:", model);
-      }
+    const solution = await generateResponse(
+      TEXT_MODELS,
+      messages
+    );
+
+    if (!solution) {
+      return bot.sendMessage(
+        chatId,
+        "❌ সব AI model বর্তমানে ব্যস্ত।"
+      );
     }
 
-    if (solution) {
-      await bot.sendMessage(chatId, cleanLatex(solution));
+    if (science) {
+      await sendSolutionImage(chatId, solution);
     } else {
-      await bot.sendMessage(chatId, "❌ সব model এখন busy। একটু পরে আবার চেষ্টা করো।");
+      await bot.sendMessage(chatId, cleanLatex(solution));
     }
-
   } catch (error) {
-    console.error("Text error:", error.message);
-    await bot.sendMessage(chatId, "❌ দুঃখিত, সমস্যা হয়েছে। আবার চেষ্টা করো।");
+    console.error(error);
+    await bot.sendMessage(
+      chatId,
+      "❌ একটি সমস্যা হয়েছে। আবার চেষ্টা করো।"
+    );
   }
 });
